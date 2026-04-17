@@ -44,7 +44,7 @@ opinion_task:
 write_task:
   description: >
     Write the final blog comment. Requirements:
-    - 3–6 sentences, conversational but substantive.
+    - 2-3 sentences, conversational but substantive.
     - Express the opinion clearly — no hedging.
     - If a URL was found, include it naturally (not as a bare link).
     - End with a question or statement that invites the author to respond.
