@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
 
+    serper_api_key: str = ""
+
     log_level: str = "INFO"
 
 
