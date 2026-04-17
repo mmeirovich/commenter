@@ -1,0 +1,63 @@
+analyze_task:
+  description: >
+    Analyze the following blog post:
+
+    TITLE: {post_title}
+
+    {content_section}
+
+    Identify: main thesis, key claims, target audience, notable strengths, and any gaps or errors.
+  expected_output: >
+    A structured analysis with sections: Main Thesis, Key Claims (bullet list),
+    Strengths, Gaps/Errors, and Audience.
+  agent: analyst
+
+research_task:
+  description: >
+    Using the analysis above, search the web for:
+    1. Recent data or studies that support or contradict the main claims.
+    2. Alternative viewpoints from credible sources.
+    3. The single most relevant URL to reference in a comment.
+
+    Focus on content published in the last 2 years.
+  expected_output: >
+    A research brief with: key findings (bullet list), contrarian evidence (if any),
+    and the single best URL to cite.
+  agent: researcher
+  context:
+    - analyze_task
+
+opinion_task:
+  description: >
+    Based on the post analysis and research findings, decide on a clear stance:
+    - Do you largely agree, disagree, or offer a nuanced view?
+    - What is the single most important point to make?
+    - What tone fits best (constructive, challenging, supportive, skeptical)?
+  expected_output: >
+    A one-paragraph opinion brief: stance (agree/disagree/nuanced),
+    the central point to make, supporting evidence, and recommended tone.
+  agent: opinion_former
+  context:
+    - analyze_task
+    - research_task
+
+write_task:
+  description: >
+    Write the final blog comment. Requirements:
+    - 3–6 sentences, conversational but substantive.
+    - Express the opinion clearly — no hedging.
+    - If a URL was found, include it naturally (not as a bare link).
+    - End with a question or statement that invites the author to respond.
+
+    Also provide:
+    - A one-sentence summary of the comment's stance.
+    - A list of any URLs referenced (empty list if none).
+
+    Return a JSON object with keys: comment (string), summary (string), sources (list of strings).
+  expected_output: >
+    Valid JSON with keys "comment" (string), "summary" (string), "sources" (list of strings).
+  agent: writer
+  context:
+    - analyze_task
+    - research_task
+    - opinion_task
