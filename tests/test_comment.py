@@ -55,9 +55,14 @@ def test_create_comment_missing_title() -> None:
     assert response.status_code == 422
 
 
-def test_create_comment_short_text() -> None:
-    response = client.post(
-        "/comment/",
-        json={"post_title": "Test", "post_text": "Too short"},
-    )
-    assert response.status_code == 422
+def test_create_comment_empty_text_treated_as_none() -> None:
+    with patch(
+        "commenter.routers.comment.generate_comment",
+        new_callable=AsyncMock,
+        return_value=MOCK_RESPONSE,
+    ):
+        response = client.post(
+            "/comment/",
+            json={"post_title": "Test Post", "post_text": ""},
+        )
+    assert response.status_code == 200

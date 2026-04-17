@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CommentRequest(BaseModel):
@@ -11,11 +11,17 @@ class CommentRequest(BaseModel):
     )
     post_text: str | None = Field(
         default=None,
-        min_length=10,
         max_length=50_000,
-        description="The full text content of the blog post. If omitted, the crew works from the title only.",
+        description="The full text content of the blog post. If omitted or empty, the crew works from the title only.",
         examples=["Python continues to dominate the AI and data science landscape..."],
     )
+
+    @field_validator("post_text", mode="before")
+    @classmethod
+    def empty_string_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 
 class CommentResponse(BaseModel):
