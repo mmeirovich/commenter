@@ -34,6 +34,19 @@ def test_create_comment_success() -> None:
     assert "sources" in data
 
 
+def test_create_comment_title_only() -> None:
+    with patch(
+        "commenter.routers.comment.generate_comment",
+        new_callable=AsyncMock,
+        return_value=MOCK_RESPONSE,
+    ):
+        response = client.post(
+            "/comment/",
+            json={"post_title": "Test Post — title only"},
+        )
+    assert response.status_code == 200
+
+
 def test_create_comment_missing_title() -> None:
     response = client.post(
         "/comment/",

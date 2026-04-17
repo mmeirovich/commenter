@@ -9,11 +9,11 @@ class CommentRequest(BaseModel):
         description="The title of the blog post to comment on",
         examples=["Why Python is Still King in 2026"],
     )
-    post_text: str = Field(
-        ...,
+    post_text: str | None = Field(
+        default=None,
         min_length=10,
         max_length=50_000,
-        description="The full text content of the blog post",
+        description="The full text content of the blog post. If omitted, the crew works from the title only.",
         examples=["Python continues to dominate the AI and data science landscape..."],
     )
 

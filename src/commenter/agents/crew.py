@@ -65,11 +65,16 @@ def _build_crew(request: CommentRequest) -> Crew:
         llm=settings.openai_model,
     )
 
+    content_section = (
+        f"CONTENT:\n{request.post_text}"
+        if request.post_text
+        else "CONTENT: (not provided — infer from the title alone)"
+    )
     analyze_task = Task(
         description=(
             f"Analyze the following blog post:\n\n"
             f"TITLE: {request.post_title}\n\n"
-            f"CONTENT:\n{request.post_text}\n\n"
+            f"{content_section}\n\n"
             "Identify: main thesis, key claims, target audience, notable strengths, and any gaps or errors."
         ),
         expected_output=(
