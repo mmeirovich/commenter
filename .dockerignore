@@ -1,0 +1,16 @@
+.git
+.github
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+__pycache__
+*.py[cod]
+*.log
+.env
+.env.local
+.env.*.local
+gha-creds-*.json
+tests
+htmlcov
+coverage.xml

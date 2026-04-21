@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any, cast
 
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
@@ -16,10 +17,16 @@ class CommentCrew:
     agents_config = str(_CONFIG_DIR / "agents.yaml")
     tasks_config = str(_CONFIG_DIR / "tasks.yaml")
 
+    def _agent_config(self, name: str) -> dict[str, Any]:
+        return cast("dict[str, Any]", cast("dict[str, Any]", self.agents_config)[name])
+
+    def _task_config(self, name: str) -> dict[str, Any]:
+        return cast("dict[str, Any]", cast("dict[str, Any]", self.tasks_config)[name])
+
     @agent
     def analyst(self) -> Agent:
         return Agent(
-            config=self.agents_config["analyst"],  # type: ignore[index]
+            config=self._agent_config("analyst"),
             verbose=False,
             allow_delegation=False,
             llm=settings.openai_model,
@@ -28,7 +35,7 @@ class CommentCrew:
     @agent
     def researcher(self) -> Agent:
         return Agent(
-            config=self.agents_config["researcher"],  # type: ignore[index]
+            config=self._agent_config("researcher"),
             tools=[SerperDevTool()],
             verbose=False,
             allow_delegation=False,
@@ -38,7 +45,7 @@ class CommentCrew:
     @agent
     def opinion_former(self) -> Agent:
         return Agent(
-            config=self.agents_config["opinion_former"],  # type: ignore[index]
+            config=self._agent_config("opinion_former"),
             verbose=False,
             allow_delegation=False,
             llm=settings.openai_model,
@@ -47,7 +54,7 @@ class CommentCrew:
     @agent
     def writer(self) -> Agent:
         return Agent(
-            config=self.agents_config["writer"],  # type: ignore[index]
+            config=self._agent_config("writer"),
             verbose=False,
             allow_delegation=False,
             llm=settings.openai_model,
@@ -55,19 +62,19 @@ class CommentCrew:
 
     @task
     def analyze_task(self) -> Task:
-        return Task(config=self.tasks_config["analyze_task"])  # type: ignore[index]
+        return Task(config=self._task_config("analyze_task"))  # type: ignore[call-arg]
 
     @task
     def research_task(self) -> Task:
-        return Task(config=self.tasks_config["research_task"])  # type: ignore[index]
+        return Task(config=self._task_config("research_task"))  # type: ignore[call-arg]
 
     @task
     def opinion_task(self) -> Task:
-        return Task(config=self.tasks_config["opinion_task"])  # type: ignore[index]
+        return Task(config=self._task_config("opinion_task"))  # type: ignore[call-arg]
 
     @task
     def write_task(self) -> Task:
-        return Task(config=self.tasks_config["write_task"])  # type: ignore[index]
+        return Task(config=self._task_config("write_task"))  # type: ignore[call-arg]
 
     @crew
     def build(self) -> Crew:
@@ -86,11 +93,15 @@ async def generate_comment(request: CommentRequest) -> CommentResponse:
         else "CONTENT: (not provided — infer from the title alone)"
     )
 
-    result = CommentCrew().build().kickoff(
-        inputs={
-            "post_title": request.post_title,
-            "content_section": content_section,
-        }
+    result = (
+        CommentCrew()
+        .build()
+        .kickoff(
+            inputs={
+                "post_title": request.post_title,
+                "content_section": content_section,
+            }
+        )
     )
 
     raw = str(result).strip()
@@ -101,10 +112,14 @@ async def generate_comment(request: CommentRequest) -> CommentResponse:
 
     try:
         data: dict[str, object] = json.loads(raw)
+        sources_value = data.get("sources", [])
+        sources = (
+            [str(source) for source in sources_value] if isinstance(sources_value, list) else []
+        )
         return CommentResponse(
             comment=str(data.get("comment", raw)),
             summary=str(data.get("summary", "")),
-            sources=list(data.get("sources", [])),  # type: ignore[arg-type]
+            sources=sources,
         )
     except json.JSONDecodeError:
         return CommentResponse(comment=raw, summary="", sources=[])

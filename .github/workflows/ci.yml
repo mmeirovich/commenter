@@ -5,6 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT_ID: gen-lang-client-0727840060
+  GCP_REGION: europe-west1
+  CLOUD_RUN_SERVICE: commenter
+  ARTIFACT_REGISTRY_REPOSITORY: commenter
+  IMAGE_NAME: commenter
 
 jobs:
   lint-and-test:
@@ -42,3 +50,104 @@ jobs:
         env:
           OPENAI_API_KEY: "sk-test-placeholder"
           SERPER_API_KEY: "test-placeholder"
+
+  docker-smoke-test:
+    name: Docker Smoke Test
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t commenter:test .
+
+      - name: Start container
+        run: |
+          docker run -d --rm \
+            --name commenter-test \
+            -p 8000:8000 \
+            -e OPENAI_API_KEY="sk-test-placeholder" \
+            -e SERPER_API_KEY="test-placeholder" \
+            commenter:test
+
+      - name: Wait for health endpoint
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs commenter-test
+          exit 1
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f commenter-test >/dev/null 2>&1 || true
+
+  deploy-cloud-run:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: docker-smoke-test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Ensure Artifact Registry repository exists
+        run: |
+          gcloud artifacts repositories describe "${{ env.ARTIFACT_REGISTRY_REPOSITORY }}" \
+            --location "${{ env.GCP_REGION }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1 || \
+          gcloud artifacts repositories create "${{ env.ARTIFACT_REGISTRY_REPOSITORY }}" \
+            --repository-format docker \
+            --location "${{ env.GCP_REGION }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --description "Docker images for commenter"
+
+      - name: Set image URI
+        id: image
+        run: |
+          echo "uri=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t "${{ steps.image.outputs.uri }}" .
+          docker push "${{ steps.image.outputs.uri }}"
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: ${{ env.CLOUD_RUN_SERVICE }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          region: ${{ env.GCP_REGION }}
+          image: ${{ steps.image.outputs.uri }}
+          env_vars_update_strategy: overwrite
+          env_vars: |-
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            SERPER_API_KEY=${{ secrets.SERPER_API_KEY }}
+            OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
+            HOST=${{ secrets.HOST }}
+            PORT=${{ secrets.PORT }}
+            DEBUG=${{ secrets.DEBUG }}
+            LOG_LEVEL=${{ secrets.LOG_LEVEL }}
+          flags: >-
+            --port=${{ secrets.PORT }}
+            --allow-unauthenticated
+
+      - name: Verify deployed service
+        run: curl --fail --silent --show-error "${{ steps.deploy.outputs.url }}/health"

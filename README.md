@@ -91,6 +91,17 @@ Interactive docs at `http://localhost:8000/docs`.
 DEBUG=true uv run commenter
 ```
 
+### Run with Docker
+
+```bash
+docker build -t commenter .
+docker run --rm \
+  -p 8000:8000 \
+  -e OPENAI_API_KEY=sk-... \
+  -e SERPER_API_KEY=... \
+  commenter
+```
+
 ---
 
 ## Usage
@@ -169,6 +180,45 @@ All configuration is via environment variables (or a `.env` file):
 | `PORT` | `8000` | Bind port |
 | `DEBUG` | `false` | Enable uvicorn auto-reload |
 | `LOG_LEVEL` | `INFO` | Log verbosity |
+
+### Sync local `.env` to GitHub Secrets
+
+Use the helper script whenever you want to push your local `.env` values into repository secrets for CI/CD:
+
+```bash
+uv run python scripts/sync_env_to_github_secrets.py
+```
+
+Optional flags:
+
+- `--dry-run` prints the secret names that would be uploaded
+- `--repo owner/repo` targets a different repository
+- `--exclude NAME` skips a specific variable
+
+The script uploads every key in `.env` as a GitHub Actions secret with the same name. It requires `gh auth login` first.
+
+### Cloud Run deployment from GitHub Actions
+
+The CI workflow will deploy on every push to `main` and on manual `workflow_dispatch`.
+
+Expected GitHub repository secrets:
+
+| Secret | Purpose |
+|---|---|
+| `GCP_SA_KEY` | Minified Google Cloud service account JSON for deployment auth |
+| `OPENAI_API_KEY` | Runtime app config |
+| `SERPER_API_KEY` | Runtime app config |
+| `OPENAI_MODEL` | Runtime app config |
+| `HOST` | Runtime app config |
+| `PORT` | Runtime app config and Cloud Run container port |
+| `DEBUG` | Runtime app config |
+| `LOG_LEVEL` | Runtime app config |
+
+Cloud Run target:
+
+- Project: `gen-lang-client-0727840060`
+- Region: `europe-west1`
+- Service: `commenter`
 
 ---
 
